@@ -302,3 +302,139 @@ W twigu z assetów można skorzystać za pomocą funcji asset, dostarczoną wraz
 Assety są automatycznie wersjonowane, co usprawnia ilość zapytań do serwera dzięki cache.
 
 ### 14. TailwindCSS
+
+Dodanie tailwindcss w symfony odbywa sie za pomocą:
+
+> composer require symfonycasts/tailwind-bundle
+> php bin/console tailwind:init
+
+Uruchomienie builda z watchem odbywa sie za pomocą komendy:
+
+> php bin/console tailwind:build -w
+
+Uruchomienie watcha można zautomatyzować za pomocą pliku binarnego symfony: **.symfony.local.yaml**
+
+```yaml
+workers:
+    tailwind:
+        cmd: ['symfony', 'console', 'tailwind:build', '--watch']
+```
+
+Po dodaniu tego wpisu działa przebudowanie po właczeniu serwera symfony: **symfony serve**
+
+### 15. Komponenty twigowe & pętle for
+
+Dodawanie komponentów do pliku w twigu odbywa sie przez dyrektywę include:
+
+```php
+{{ include('main/_shipStatusAside.html.twig')}}
+```
+
+Pętle mają następującą składnię:
+
+```php
+{% for ship in ships %}
+{% endfor %}
+```
+
+### 16. Enumy w PHP
+
+Tworzenie StarshipStatusEnum z wartościami:
+
+```php
+namespace App\Model;
+
+enum StarshipStatusEnum: string
+{
+    case WAITING = 'waiting';
+    case IN_PROGRESS = 'in progress';
+    case COMPLETED = 'completed';
+}
+```
+
+Użycie enum w repository:
+
+```php
+return [
+  new Starship(
+      1,
+      'USS LeafyCruiser (NCC-0001)',
+      'Garden',
+      'Jean-Luc Pickles',
+      StarshipStatusEnum::IN_PROGRESS
+  ),
+  new Starship(
+      2,
+      'USS VeggieVoyager (NCC-0002)',
+      'Botanical',
+      'James T. Tomato',
+      StarshipStatusEnum::COMPLETED
+  ),
+  new Starship(
+      3,
+      'USS Cosmic Cruiser (NCC-0003)',
+      'Interstellar',
+      'Spock Lettuce',
+      StarshipStatusEnum::WAITING
+  ),
+];
+```
+
+Potrzebne jest również typowanie wg. enuma w modelu Starship:
+
+```php
+public function __construct(
+    private int $id,
+    private string $name,
+    private string $class,
+    private string $captain,
+    private StarshipStatusEnum $status,
+) {
+}
+
+public function getStatus(): StarshipStatusEnum
+{
+    return $this->status;
+}
+```
+
+Późniejsze odczytywanie informacji odbywa się za pomocą właściwości value, bo nie można łatwo konwertować enum do stringa:
+
+```php
+    <p class="uppercase text-xs text-nowrap">{{ ship.status.value }}</p>
+```
+
+### 17. Sprytne metody na modelach & tworzenie dynamicznego designu
+
+Dla czystości kodu można odwołać się do ship.statusString zamiast do ship.status.value. 
+
+```php
+public function getStatusString(): string
+{
+    return $this->status->value;
+}
+```
+
+Linkowanie do strony pojedynczego statku odbywa się za pomocą odniesienia do nazwy routy i przekazania id:
+
+```php
+<a
+    class="hover:text-slate-200"
+    href="{{ path('app_starship_show', { id: ship.id }) }}"
+>{{ ship.name }}</a>
+```
+
+Tworzenie dynamicznej ścieżki do obrazków odbywało się przez dodanie metody do modelu Starship z metchem:
+
+```php
+public function getStatusImageFilename(): string
+{
+    return match ($this->status) {
+        StarshipStatusEnum::WAITING => 'images/status-waiting.png',
+        StarshipStatusEnum::IN_PROGRESS => 'images/status-in-progress.png',
+        StarshipStatusEnum::COMPLETED => 'images/status-complete.png',
+    };
+}
+```
+
+### 18. Stimulus: Pisanie zaawansowanego JSa
