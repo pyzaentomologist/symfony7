@@ -510,3 +510,59 @@ W pliku assets/controllers.json została dodana konfiguracja symfony/ux-turbo:
 ```
 
 Teraz dzięki "enabled": true SPA jest dostępne, ponieważ js wykonuje ajax do tej strony zamiast uderzać pod nowy url.
+
+### 20. Maker bundle: generowanie komend
+
+Dodanie biblioteki odbywa sie za pomocą:
+
+> composer require symfony/maker-bundle --dev
+
+Po zastosowaniu komendy
+
+> symfony console
+
+Widzę listę dostępnych koemnd w konsoli
+Aby utworzyć nową komendę muszę wywołać:
+
+> symfony console make:command
+
+Następnie konsola zapyta jak ma się nazywać nowa komenda
+Podaje **app:ship-report**
+
+Podczas wysołąnia koemndy
+
+> symfony console app:ship-report
+
+Uruchamiam ją, dostęp kodu komendy jest z poziomu pliku **src/Command/ShipReportCommand.php**
+W metodzie execute() mam dostęp do manipulacji argumentami oraz dzieki obiektowi io manipulacji przedstawionymi danymi w konsoli za pomocą stylowania symfony:
+
+```php
+protected function execute(InputInterface $input, OutputInterface $output): int
+{
+    $io = new SymfonyStyle($input, $output);
+    $arg1 = $input->getArgument('arg1');
+
+    if ($arg1) {
+        $io->note(sprintf('You passed an argument: %s', $arg1));
+    }
+
+    if ($input->getOption('option1')) {
+        // ...
+    }
+
+    $io->success('You have a new command! Now make it your own! Pass --help to see your options.');
+
+    return Command::SUCCESS;
+}
+```
+
+Przykładowo dodanie paska progresu:
+
+```php
+$io->progressStart(100);
+for ($i = 0; $i < 100; ++$i) {
+    $io->progressAdvance();
+    usleep(10000);
+}
+$io->progressFinish();
+```
