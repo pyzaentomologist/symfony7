@@ -438,3 +438,46 @@ public function getStatusImageFilename(): string
 ```
 
 ### 18. Stimulus: Pisanie zaawansowanego JSa
+
+Dodanie stimulusa:
+
+> composer require symfony/stimulus-bundle
+
+Dodanie stimulusa powoduje dodanie w assetach app.js importującego bootstrap.js, a w bootstrap.js jest import:
+
+```js
+import { startStimulusApp } from '@symfony/stimulus-bundle';
+const app = startStimulusApp();
+```
+
+Stimulus "porozumiewa się" za pomocą kontrolerów assets/controllers/xxx_controller.js
+
+W kontrolerach są metody, które można wywołać przez deklarację na kontenerze atrybutu "data-controller". Jeśli chcę oznaczyć jakiś handler, to powinienem na handlerze oznaczyć atrybut "data-action":
+
+```js
+<div class="flex justify-between mt-11 mb-7">
+    <button data-action="closeable#close">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 448 512"><!--!Font Awesome Pro 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2024 Fonticons, Inc.--><path fill="#fff" d="M384 96c0-17.7 14.3-32 32-32s32 14.3 32 32V416c0 17.7-14.3 32-32 32s-32-14.3-32-32V96zM9.4 278.6c-12.5-12.5-12.5-32.8 0-45.3l128-128c12.5-12.5 32.8-12.5 45.3 0s12.5 32.8 0 45.3L109.3 224 288 224c17.7 0 32 14.3 32 32s-14.3 32-32 32l-178.7 0 73.4 73.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0l-128-128z"/></svg>
+    </button>
+</div>
+```
+
+W kontrolerze closeable_controller.js powinny znaleźć się metody obsługujące poprawne działanie:
+
+```js
+import { Controller } from '@hotwired/stimulus';
+export default class extends Controller {
+    async close() {
+        this.element.style.width = '0';
+        await this.#waitForAnimation();
+        this.element.remove();
+    }
+    #waitForAnimation() {
+        return Promise.all(
+            this.element.getAnimations().map((animation) => animation.finished),
+        );
+    }
+}
+```
+
+Hashtag "#" w js ma za zadanie wyznaczyć metodę prywatną.
