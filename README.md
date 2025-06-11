@@ -481,3 +481,32 @@ export default class extends Controller {
 ```
 
 Hashtag "#" w js ma za zadanie wyznaczyć metodę prywatną.
+
+### 19. Turbo - SPA
+
+Dodanie turbo do projektu:
+
+> composer require symfony/ux-turbo
+
+W pliku assets/controllers.json została dodana konfiguracja symfony/ux-turbo:
+
+```json
+
+{
+    "controllers": {
+        "@symfony/ux-turbo": {
+            "turbo-core": {
+                "enabled": true,
+                "fetch": "eager"
+            },
+            "mercure-turbo-stream": {
+                "enabled": false,
+                "fetch": "eager"
+            }
+        }
+    },
+    "entrypoints": []
+}
+```
+
+Teraz dzięki "enabled": true SPA jest dostępne, ponieważ js wykonuje ajax do tej strony zamiast uderzać pod nowy url.
