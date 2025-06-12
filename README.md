@@ -579,3 +579,25 @@ Kontrola jakie mamy serwisy w aplikacji za pomocą komendy:
 > symfony console debug:container
 
 Lista serwisów po wykonaniu komendy pochodzi z pliku: **config/bundles.php**
+
+### 02. KnpTimeBundle: Install the Bundle, Get its Service
+
+KnpTimeBundle to paczka, która będzie formatowała daty. Przykłądowo automatycznie obliczy ile czasu od teraz upłynęło do danej daty.
+
+Dodanie biblioteki za pomocą:
+
+> composer require knplabs/knp-time-bundle
+
+Za pomocą komendy można sprawdzić właściwości serwisów powiązanych z obsługą czasu
+
+> symfony console debug:container time
+
+Jeśli chcemy sprawdzić dostępne twigowe metody filtrowania związane z czasem, trzeba skorzystać z komendy:
+
+> symfony console debug:twig
+
+```twig
+<div>
+    Arrived at: <span class="text-slate-400">{{ ship.arrivedAt|ago }}</span>
+</div>
+```
