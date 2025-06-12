@@ -566,3 +566,16 @@ for ($i = 0; $i < 100; ++$i) {
 }
 $io->progressFinish();
 ```
+
+## Symfony 7 Fundamentals: Services, Config & Environments
+
+### 01. Setup, Services & the Service Container
+
+Serwisy to kod (obiekt) odpowiadający za wykonywanie okreslonych czynności np. łączenie z bazą, obsługa mailera, logowanie czynności.
+Nie każdy obiekt jest serwisem, np. modele nimi nie są, bo przechowują dane bez wykonywania jakichś czynności.
+
+Kontrola jakie mamy serwisy w aplikacji za pomocą komendy:
+
+> symfony console debug:container
+
+Lista serwisów po wykonaniu komendy pochodzi z pliku: **config/bundles.php**
