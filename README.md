@@ -601,3 +601,7 @@ Jeśli chcemy sprawdzić dostępne twigowe metody filtrowania związane z czasem
     Arrived at: <span class="text-slate-400">{{ ship.arrivedAt|ago }}</span>
 </div>
 ```
+
+Co ciekawe jeśli w debugu jest info o argumentach przekazywanych do funkcji twigowych, to pierwszy argument zawsze jest automatycznie pobierany z wartości któa jest przez pipem "|"
+
+### 03. The HTTP Client Service
