@@ -605,3 +605,13 @@ Jeśli chcemy sprawdzić dostępne twigowe metody filtrowania związane z czasem
 Co ciekawe jeśli w debugu jest info o argumentach przekazywanych do funkcji twigowych, to pierwszy argument zawsze jest automatycznie pobierany z wartości któa jest przez pipem "|"
 
 ### 03. The HTTP Client Service
+
+Aby sprawdzić jakie mamy klasy powiązane z http, można skorzystać z komendy:
+
+> bin/console debug:autowiring http
+
+Jeśli nie ma potrzebnej biblioteki, to trzeba dodać do projektu np.
+
+> composer require symfony/http-client
+
+Http-client pozwoli nam na skorzystanie z metod takich jak request.
