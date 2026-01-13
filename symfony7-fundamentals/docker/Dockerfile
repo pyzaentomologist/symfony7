@@ -1,5 +1,5 @@
 # Użycie obrazu PHP 8 z Apache
-FROM php:8.3-apache
+FROM php:8.5-apache
 
 RUN a2enmod rewrite
 # Aktualizacja pakietów systemowych i instalacja niezbędnych narzędzi
@@ -28,6 +28,6 @@ WORKDIR /var/www
 COPY . .
 
 # Instalacja zależności przez Composer
-RUN composer install --no-dev --no-scripts --no-interaction --prefer-dist --optimize-autoloader && composer update
+RUN composer install --no-scripts --no-interaction --prefer-dist --optimize-autoloader && composer update && composer install --dev
 
 CMD ["apache2-foreground"]

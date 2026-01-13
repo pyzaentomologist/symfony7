@@ -615,3 +615,342 @@ Jeśli nie ma potrzebnej biblioteki, to trzeba dodać do projektu np.
 > composer require symfony/http-client
 
 Http-client pozwoli nam na skorzystanie z metod takich jak request.
+
+### 04. Cache Service and Cache Pools
+
+Cache pool to coś jak podkatalog dla projektu. Moża wyczyścić cache w poolu, bez czyszczenia całego cache.
+
+Owrapowanie cachem kodu:
+
+```php
+$issData = $cache->get('iss_location_data', function (ItemInterface $item) use ($client): array {
+    $item->expiresAfter(5);
+    $response = $client->request('GET', 'https://api.wheretheiss.at/v1/satellites/25544');
+    return $response->toArray();
+});
+```
+
+Wyświetlenie listy cache:
+
+> bin/console cache:pool:list
+
+Cache można usunąć na 3 sposoby:
+
+- kasując cały cache (symfony console cache:clear)
+- kasując konkretny katalog var cache (rm -rf var/cache/prod/pools/stocks/)
+- kasując konkretny cache z katalogu (bin/console cache:pool:clear stocks)
+
+### 05. Bundle Config: Configuring the Cache Service
+
+Domyślnie cache w symfony jest przechowywane "na dysku" jako część FilesystemAdapter.
+Można zmienić to na pamięć w trakcie żądania dzięki zamieszczeniu w pliku konfiguracujnym config/packages/cache.yaml:
+
+```yaml
+framework:
+    cache:
+        app: cache.adapter.array
+```
+
+Czemu cache w pamięci żądania jest przydatne w porównaniu do niekorzystania z cahce? Jeśli podczas jednego żądania w różnych miejscach kontrolera są potrzebne zewnętrzne dane, to nie pobieramy ich za każdym razem, tylko przy pierwszym zapytaniu.
+
+Komenda zwraca aktualną konfigurację dla rozszerzenia (w tym przypadku twig):
+
+> bin/console debug:config twig
+
+Komenda zwraca domyślną konfigurację:
+
+> bin/console config:dump-reference twig
+
+### 06. How autowiring works
+
+autowiring to automatyczne definiowanie zależności serwisów
+
+> bin/console debug:autowiring
+
+Ta komenda pokazuje listę serwisów możliwych do zdefiniowania.
+Następna komenda wskazuje listę serwisów i ich ID:
+
+> bin/console debug:container
+
+Jeśli ID serwisu nie jest interfacem lub nazwą klasy, to jego nadpisanie nie jest możliwe.
+
+Dodanie poolu odbywa sie przez **config/packages/cache.yaml**
+
+```yaml
+framework:
+    cache:
+        pools:
+            iss_location_pool:
+                default_lifetime: 5
+```
+
+Po wpisaniu bin/console debug:autowiring pojawia się w konsoli:
+
+> Covers most simple to advanced caching needs.
+> Symfony\Contracts\Cache\CacheInterface - alias:cache.app
+> Symfony\Contracts\Cache\CacheInterface $issLocationPool - target:iss_location_pool
+
+Można użyć $issLocationPool jako miejsca w którym jest pchechowywany cache dla danych z tej grupy:
+
+```php
+public function homepage(
+    StarshipRepository $starshipRepository,
+    HttpClientInterface $client,
+    CacheInterface $issLocationPool,
+): Response {
+[...]
+    $issData = $issLocationPool->get('iss_location_data', function () use ($client): array {
+        $response = $client->request('GET', 'https://api.wheretheiss.at/v1/satellites/25544');
+        return $response->toArray();
+    });
+[...]
+}
+```
+
+Pomaga to zachować porządek w projekcie.
+
+### 7. Symfony environments
+
+W pliku .env znajdują się zmienne środowiskowe.
+W nich są informacje o środowisku i hash z sekretem:
+
+```env
+APP_ENV=
+APP_SECRET=
+```
+
+Za odczyt .env odpowiada kontroler /public/index.php
+/public/index.php nadaje kontekst zmiennych, tworzy instancje App/Kernel.
+App/Kernel używa MicroKernelTrait, tam znajdują się informacje o tym jak działają konfiguracje i skąd pochodzą.
+Jest jeszcze jeden sposób implemenctacji konfiguracji w symfony: when@{ENV} przykład w config/packages/framework.yaml lub config/packages/monolog.yaml
+Określone środowiska mogą korzystać z paczek projektu w config/bundles.php - tam są określone środowiska dla konkretnych bundli.
+
+Aby działała konfiguracja na produkcji można dodać zarówno dyrektywę when@%env% w okpowednim pliku konfiguracyjnym np. cache.yaml, jak i utworzyć nową konfigurację i dodać ją do katalogu config/packages/prod/ - katalog autokmatycznie sczytywany dla produkcji.
+
+### 8. The Prod Environment
+
+Zmiany środowiska odbywa się za pomocą pliku .env: APP_ENV=prod, przy wpisywaniu komendy: APP_ENV=test symfony serve (ma zawsze pierwszeństwo) lub przez utworzenie i nadpisanie pliku .env.local do sterowania zmiennymi lokalnymi
+
+Czyszczenie cache odbywa sie za pomocą:
+
+> bin/console cache:clear
+
+Jeśli chcę wyczyścić cache na konkretnym środowisku trzeba użyć flagi:
+
+> bin/console cache:clear --env=prod
+
+Zamiana adaptera do przechowywania cache następuje w config/packages/cache.yaml
+
+```yml
+when@prod:
+    framework:
+        cache:
+            app: cache.adapter.filesystem
+```
+
+Zmieniono z array na filesystem.
+
+### 9. More about services
+
+Rejestrowanie serwisów odbywa się w config/services.yaml. Źródło serwisów domyślnie jest ustawione w resource: '../src/', a wyłączone są pliki takie jak DependencyInjection, Encje, Kernel. Te pliki nie są serwisami.
+
+Pod kluczem _defaults są konfiguracje dla wszystkich serwisów: autowire, autoconfigure, itd.
+Autowire aktumatycznie wstrzykuje zależności do serwisów, a autoconfigure rejestruje serwisy jako komendy, eventy itd.
+
+Aby sprawdzić listę serwisów uruchamia się komendę:
+
+> bin/console debug:autowiring
+
+Aby uzyskać pełną listę serwisów potrzebna jest komenda:
+
+> bin/console debug:autowiring --all
+
+W config/packages pliki mają tą samą strukturę, różnią się tylko kluczem jak services lub framework.
+
+### 10. Parameters
+
+Aby uzyskać informacje o tym jaki kontener ma podpięty który serwis, potrzebna była komenda:
+
+> bin/console debug:container
+
+Informacje o serwisach nie są jedynymi informacjami przechowywanymi w projektach, kolejne są parametry:
+
+> bin/console debug:container --parameters
+
+Parametry to wartości, które są przypisane w kontenerze, np. wartości z pliku env:
+
+```
+kernel.environment    dev
+```
+
+W kodzie możemy użyć takiego parametru przez odwołanie się do metody getParameter():
+
+```
+$this->getParameter('kernel.project_dir')
+```
+
+W pliku config/packages/twig.yaml jest linijka:
+
+```yaml
+twig:
+    default_path: '%kernel.project_dir%/templates'
+```
+
+Jest to odwołanie do parametru kernel.project_dir, a zamknięcie parametru pomiędzy znakami %[parameter name]% jest składnią odwołania do parametru w yaml.
+
+### 11. Non-Autowireable Arguments
+
+W pliku config/services.yaml jest sekcja parameters, w niej można zamieszczać parametry
+
+```yaml
+parameters:
+    iss_location_cache_ttl: 5
+```
+
+Chcąc użyc w kodzie można albo odwołać się do parametru przez getParameter:
+
+```
+dd($this->getParameter('iss_location_cache_ttl'));
+```
+
+Albo odwołać się do parametru z services przy pomocy Autowire i param:
+
+```
+public function homepage(
+    #[Autowire(param: 'iss_location_cache_ttl')]
+    $issLocationCacheTtl,
+): Response {
+    dd($issLocationCacheTtl);
+}
+```
+
+```
+#[Autowire(param: 'iss_location_cache_ttl')] może zostać zamienione na #[Autowire('%iss_location_cache_ttl%')]
+```
+
+Lub używając bind w services i automatycznie dodając parametr przez defaults:
+
+```yaml
+services:
+    # default configuration for services in *this* file
+    _defaults:
+        autowire: true      # Automatically injects dependencies in your services.
+        autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
+        bind:
+            $issLocationCacheTtl: '%iss_location_cache_ttl%'
+```
+
+```
+public function homepage(
+    $issLocationCacheTtl,
+): Response {
+    dd($issLocationCacheTtl);
+}
+```
+
+### 12. Non-Autowireable Services
+
+Symfony nie tworzy aliasu typu klasy dla komend konsolowych, dlatego jesli np. chce się użyć w kodzie twig.command.debug, to trzeba użyć autowire:
+
+```
+class MainController extends AbstractController
+{
+    #[Route('/', name: 'app_homepage')]
+    public function homepage(
+        StarshipRepository $starshipRepository,
+        HttpClientInterface $client,
+        CacheInterface $issLocationPool,
+        #[Autowire(service: 'twig.command.debug')]
+        DebugCommand $twigDebugCommand,
+    ): Response {
+        [...]
+    }
+}
+```
+
+Jeśli domyślnie coś nie jest autowireable to można ręcznie dodać do obsługi za pomocą:
+
+```
+#[Autowire(service: 'twig.command.debug')]
+
+lub
+
+#[Autowire('@twig.command.debug')]
+```
+
+### 13. Environment Variables
+
+Zmienne środowiskowe wywołuje się w plikach .yaml za pomocą składni:
+
+```yaml
+parameters:
+    iss_location_cache_ttl: '%env(ISS_LOCATION_CACHE_TTL)%'
+```
+
+Dodanie int: w env() wywoła wartość int:
+
+```yaml
+parameters:
+    iss_location_cache_ttl: '%env(int:ISS_LOCATION_CACHE_TTL)%'
+```
+
+Zmienną można zdebugować za pomocą:
+
+> bin/console debug:dotenv
+
+Oprócz zmiennych .env można skorzystać z "Symfony secrets", jest do tego sobny kurs.
+
+### 13. Autoconfiguration
+
+Na środowisku dev i test można skorzystać z maker-bundle. Przy wowołaniu kommendy make:
+
+> bin/console make:
+
+Otrzymam podpowiedzi związanę z komendą make.
+Na potrzeby zadania skorzystam z komendy:
+
+> bin/console make:twig-extension
+
+Tworzymy nowe rozszerzenie:
+
+```php
+<?php
+namespace App\Twig\Extension;
+use App\Twig\Runtime\AppExtensionRuntime;
+use Twig\Extension\AbstractExtension;
+use Twig\TwigFilter;
+use Twig\TwigFunction;
+class AppExtension extends AbstractExtension
+{
+    public function getFunctions(): array
+    {
+        return [
+            new TwigFunction('function_name', [AppExtensionRuntime::class, 'doSomething']),
+        ];
+    }
+}
+```
+
+Podstawiamy odpowiednie nazwy pod metody: function_name to nazwa metody, która będzie używana w twig, a doSomething to nazwa metody, która będzi eużywana w ExtensionRuntime, który został utworzony razem z Extension:
+
+```php
+<?php
+namespace App\Twig\Runtime;
+use Twig\Extension\RuntimeExtensionInterface;
+class AppExtensionRuntime implements RuntimeExtensionInterface
+{
+    public function __construct()
+    {
+        // Inject dependencies if needed
+    }
+    public function getIssLocationData($value)
+    {
+        // ...
+    }
+}
+```
+
+Dzieki temu można zrezygnować z wstrzykiwania zmiennych z kontrolera do szablonu i bezpośrednio skorzystać z nich w kazdym szablonie twigowym.
+
+Sztuczka działa dzięki /config/services.yaml i ustawieniu autoconfigure: true.
+To trochę uciążliwy feature, bo cały kod odpowiedzialnyz a ładowanie tych rozszerzeń jest uruchamiany na kazdym szablonie.
