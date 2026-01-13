@@ -15,5 +15,12 @@ framework:
         #app: cache.adapter.apcu
 
         # Namespaced pools use the above "app" backend by default
-        #pools:
-            #my.dedicated.cache: null
+        
+        pools:
+            iss_location_pool:
+                default_lifetime: '%iss_location_cache_ttl%'
+
+when@prod:
+    framework:
+        cache:
+            app: cache.adapter.filesystem
