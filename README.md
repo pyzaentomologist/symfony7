@@ -954,3 +954,29 @@ Dzieki temu można zrezygnować z wstrzykiwania zmiennych z kontrolera do szablo
 
 Sztuczka działa dzięki /config/services.yaml i ustawieniu autoconfigure: true.
 To trochę uciążliwy feature, bo cały kod odpowiedzialnyz a ładowanie tych rozszerzeń jest uruchamiany na kazdym szablonie.
+
+## Symfony 7 Fundamentals: Doctrine, Symfony 7 & the Database
+
+### 01. Installing Doctrine
+
+Doctrine pozwala na mapowanie obiektów PHP na tabela baz danych.
+
+Instalacja za pomoca komendy:
+
+> composer require doctrine
+
+Komenda instaluje pakiet Flex (symfony/orm-pack) z libkami potrzebnymi doctrine.
+
+### 02. Database Setup & Docker
+
+Dodanie doctrine i postressql do dockera.
+
+Komenda do sprawdzania zmiennych exportowanych przez symfony:
+
+> symfony var:export --multiline
+
+Do korzystania ze zmiennych wprowadzanych do Dockera powinno się korzystać z komendy:
+
+> symfony console
+
+zamiast bin/console, dzięki symfony console można np. użyć w komendzie DATABASE_URL
