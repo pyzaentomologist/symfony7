@@ -980,3 +980,76 @@ Do korzystania ze zmiennych wprowadzanych do Dockera powinno się korzystać z k
 > symfony console
 
 zamiast bin/console, dzięki symfony console można np. użyć w komendzie DATABASE_URL
+
+### 03. Starship Entity
+
+Doctrine ORM używa encji (klas PHP) do odczytywania tabel bazy danych.
+
+Tworzenie nowej encji przez komendę
+
+> symfony console make:entity
+
+Podczas wybierania właściwości kolumn można odpytać konsolę za pomocą "?" i wybrać np. relację, albo jakiś nietypowy typ np. enum.
+
+Atrybut
+
+> #[ORM\Column]
+
+definiuje kolumny bazy oraz ich typ danych.
+
+Powstałą schemę można zwalidować za pomoca komendy:
+
+> symfony console doctrine:schema:validate
+
+### 04. Migrations
+
+Migracje tworzy się za pomoca komendy:
+
+> symfony console make:migration
+
+**Problem podczas migracji:** w linku do posgressa trzeba było zmienić server 127.0.0.1 na string "database"
+
+Migracja jest klasą PHP z metodami getDescription() up() i down(). Migracje znajdują sie w katalogu migrations/.
+Listę migracji można sprawdzić za pomocą komendy:
+
+> symfony console doctrine:migrations:list
+
+Odpalenie migracji następuje za pomoca komendy:
+
+> symfony console doctrine:migrations:migrate
+
+Doctrine śledzi migracje dzięki tabeli doctrine_migration_versions w bazie danych, w której sa utworzone wiersze dla każdej migracji. Podejrtzenie takiej tabeli za pomocą komendy:
+
+> symfony console dbal:run-sql 'select * from doctrine_migration_versions'
+
+Możemy sprawdzić czy tabela z bazy danych ma jakieś wartości za pomoca komendy:
+
+> symfony console dbal:run-sql 'select * from starship'
+
+Kod: 
+
+```php
+$manager->persist($ship1);
+$manager->persist($ship2);
+$manager->persist($ship3);
+```
+
+Odpowiada za dodanie obiektów do kolejki obiektów przygotowanych do zapisu w bazie danych. Zapis odbywa sie za pomocą metody flush():
+
+```php
+$manager->flush();
+```
+
+### 05. Inserting Data via Fixtures
+
+Dodanie fixtures do projektu za pomocą komendy:
+
+> composer require --dev orm-fixtures
+
+Załadowanie fixtures za pomocą komendy:
+
+> symfony console doctrine:fixtures:load
+
+Możemy sprawdzić czy tabela z bazy danych ma jakieś wartości za pomoca komendy:
+
+> symfony console dbal:run-sql 'select * from starship'
