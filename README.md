@@ -1053,3 +1053,164 @@ Załadowanie fixtures za pomocą komendy:
 Możemy sprawdzić czy tabela z bazy danych ma jakieś wartości za pomoca komendy:
 
 > symfony console dbal:run-sql 'select * from starship'
+
+### 06. Fetching with DQL, the QueryBuilder & find()
+
+Za pomocą komendy używamy DQL:
+
+> symfony console dbal:run-sql 'select * from doctrine_migration_versions'
+
+Jednak Doctrine ma swój własny język: DQL (Doctrine Query Language):
+
+> symfony console doctrine:query:dql 'select s from App\Entity\Starship s'
+
+SQL pracuje na tabelach baz danych, a DQL pracuje z encjami.
+
+Komenda zwraca tablicę obiektów stdClass.
+
+Zamiast komendy można wykonać kod odpytujący Doctrine przy pomocy EntityManagerInterface:
+
+```php
+#[Route('/', name: 'app_homepage')]
+public function homepage(
+    EntityManagerInterface $em,
+): Response {
+    $ships = $em->createQuery('SELECT s FROM App\Entity\Starship s')->getResult();
+    $myShip = $ships[array_rand($ships)];
+    
+    return $this->render('main/homepage.html.twig', [
+        'myShip' => $myShip,
+        'ships' => $ships,
+    ]);
+}
+```
+
+Zamiast odpytywania za pomocą stringa z zapytaniem, można odpytywać za pomoca createQueryBuilder():
+
+```php
+$ships = $em->createQueryBuilder()
+    ->select('s')
+    ->from(Starship::class, 's')
+    ->getQuery()
+    ->getResult();
+```
+
+EntityManagerInterface jest wykorzystywany do odpytywania encji (kolejkowanie danych (persist), zapisanie danych w bazie (flush) i zapytania).
+
+### 07. Cosmic Queries: the Repository Class
+
+Podczas tworzenia encji symfony utworzyło automatycznie plik do repozytorium korzystającego z ManagerRegistry. Dzięki temu mamy predefinioowane metody np. find() lin findAll().
+
+Dzięki repozytorium możemy tworzyć reużywalne metody odpytujące bazę i centralizować zapytania.
+
+```php
+public function findIncomplete(): array
+{
+    return $this->createQueryBuilder('s')
+        ->andWhere('s.status != :statusik')
+        ->orderBy('s.arrivedAt', 'DESC')
+        ->setParameter('statusik', StarshipStatusEnum::COMPLETED)
+        ->getQuery()
+        ->getResult();
+    ;
+}
+```
+
+**e.status** jest nazwą właściwości z encji Starship, a **:statusik** jest placeholderem dla wartości.
+
+Dzięki temu, że wypełniamy zapytanie setParameter('status', StarshipStatusEnum::COMPLETED), tworzymy placeholder, nie odpytujemy na podstawie warttości podanej przez użytkownika co optymalizuje zapytania oraz zapobiega atakom SQL injection.
+
+### 08. Alien Tech for Fixtures: Foundry & Faker
+
+Foundry jest potrzebne do obsługi fakera i wstrzykiwania testowych danych.
+
+> composer require --dev foundry
+
+Dzieki Foundry każda encja może mieć teraz Factory:
+
+> symfony console make:factory
+
+Modyfikując Factory można zamockować jak ma wyglądać uwtorzony obiekt.
+W Fixtures dodaje się obiekty wypełnione sztucznymi danymi na któych można pracować.
+Fixtures samo obsługuje połączenie z bazą, wiec persit() i flish() nie są potrzebne.
+
+Można utworzyć jeden obiekt za pomoca:
+
+```php
+createOne([
+    'name' => 'USS Espresso (NCC-1234-C)',
+    'class' => 'Latte',
+    'captain' => 'James T. Quick!',
+    'status' => StarshipStatusEnum::COMPLETED,
+    'arrivedAt' => new \DateTimeImmutable('-1 week'),
+])
+```
+
+i wiele obiektów: createMany(20)
+
+Jeśli wypełni się createOne tylko jedną właściwością, to pozostałe będą losowe, bo ładuje się metoda defaults():
+
+```php
+StarshipFactory::createOne([
+    'name' => 'Cheesecake Factory',
+]);
+```
+
+Ładowanie fixtures za pomoca komendy:
+
+> symfony console doctrine:fixtures:load
+
+### 09. Pagination
+
+Paginacja zostanie obsłużona przez bibliotekę pagerfanta
+
+> composer require babdev/pagerfanta-bundle pagerfanta/doctrine-orm-adapter
+
+Pakiet pagerfanta/doctrine-orm-adapter jest łącznikiem pomiędzy pagerfanta a doctrine.
+
+Bardzo ważne podczas paginacji jest posiadanie przewidywalnej kolejności pobierania danych.
+
+W repozytorium można użyć Pagerfanta na wyniku metody, którą chce się paginować:
+
+```php
+public function findIncomplete(): Pagerfanta
+{
+    $query = $this->createQueryBuilder('s')
+        ->where('s.status != :status')
+        ->orderBy('s.arrivedAt', 'DESC')
+        ->setParameter('status', StarshipStatusEnum::COMPLETED)
+        ->getQuery()
+    ;
+    return new Pagerfanta(new QueryAdapter($query));
+}
+```
+
+W kontrolerze można podawać parametry, które następnie będą pobierane do zapytania: $request->query->get('page', 1)
+
+```php
+$ships = $repository->findIncomplete();
+$ships->setMaxPerPage(5);
+$ships->setCurrentPage($request->query->get('page', 1));
+$myShip = $repository->findMyShip();
+return $this->render('main/homepage.html.twig', [
+    'myShip' => $myShip,
+    'ships' => $ships,
+]);
+```
+
+Informacje o liczbie elemntów można uzyskać z właściwości:
+
+```php
+{{ ships.nbResults }}, {{ ships.currentPage }} of {{ ships.nbPages }}:
+```
+
+Przekładanie stron odbywa sie za pomocą getPreviousPage i getNextPage:
+
+```php
+{% if ships.hasPreviousPage %}
+    <a href="{{ path('app_homepage', {page: ships.getPreviousPage}) }}">&lt; Previous</a>
+{% endif %}
+{% if ships.hasNextPage %}
+    <a href="{{ path('app_homepage', {page: ships.getNextPage}) }}">Next &gt;</a>
+{% endif %}
+```

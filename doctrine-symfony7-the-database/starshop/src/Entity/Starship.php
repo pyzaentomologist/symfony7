@@ -2,7 +2,7 @@
 
 namespace App\Entity;
 
-use App\Model\StarshipStatusEnum;
+use App\Entity\StarshipStatusEnum;
 use App\Repository\StarshipRepository;
 use Doctrine\ORM\Mapping as ORM;
 

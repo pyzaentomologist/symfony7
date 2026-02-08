@@ -1,7 +1,7 @@
 <?php
 
 use App\Entity\Starship;
-use App\Model\StarshipStatusEnum;
+use App\Entity\StarshipStatusEnum;
 
 $ship1 = new Starship();
 $ship1->setName('USS LeafyCruiser (NCC-0001)');
