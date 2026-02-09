@@ -1389,3 +1389,32 @@ public function checkIn(?\DateTimeImmutable $arrivedAt = null): static
 ```
 
 Następnie w komendzie używa się już tylko $ship->checkIn();
+
+## Symfony 7 Forms: The Basics
+
+### 01. Creating a Form Type Class
+
+W selu obsługi formularzy przez symfony nalezy pobrać bibliotekę 
+
+> symfony composer require form
+
+Utworzenie nowego formularz odbywa się przez komendę
+
+> symfony console make:form
+
+Metoda buildForm() przechowuje informacje o utworzonych polach formularza, a configureOptions() ustawia formularz pod wybraną encję.
+
+Wstrzyknięcie formularza do szablonu twig odbywa sie z kontrolera:
+
+```php
+#[Route('/starship-part/new', name: 'app_admin_starship_part_new', methods: ['GET', 'POST'])]
+public function newStarshipPart(): Response {
+    $form = $this->createForm(StarshipPartType::class);
+    return $this->render('admin/starship-part/new.html.twig', [
+        'form' => $form,
+    ]);
+}
+```
+
+Tworzenie FormType jest ważne, ponieważ pozwala wydzielić logikę formularza poza kontroler, co jest zdecydowanie dobrą praktyką.
+Mapowanie formularza na podstawie encji pozawala symfony utworzyć formularz automatycznie, automatycznie obsłużyć i zwalidować dane na podstawie metadanych encji.
