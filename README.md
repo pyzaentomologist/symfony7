@@ -1214,3 +1214,178 @@ Przekładanie stron odbywa sie za pomocą getPreviousPage i getNextPage:
     <a href="{{ path('app_homepage', {page: ships.getNextPage}) }}">Next &gt;</a>
 {% endif %}
 ```
+
+### 10. Starship Upgrade: Adding Slug and Timestamp Fields
+
+Zmiana sluga z /starship/{id} na np. /starship/enterprise
+
+Edytujemy encję za pomoca komendy i dodajemy pola:
+
+> symfony console make:entity Starship
+
+Dobrą praktyką jest dodawanie nullable, a później zmienianie pól, żeby nie generować na stępie błędów. Co prawda można to zrobić w jednej migracji, ale łatwiej wycofywać krokami, zamiast wielką migrację na raz.
+Po dodaniu pól dodajemy migrację:
+
+> symfony console make:migration
+
+I wykonujemy migrację:
+
+> symfony console doctrine:migrations:migrate
+
+Po wszystkim można nanieść zmiany w Encji, tylko trzeba ponownie uruchomić migrację:
+
+> symfony console make:migration
+
+I wykonujemy migrację:
+
+> symfony console doctrine:migrations:migrate.
+
+Jeśli usuwamy nullable, lub dodajemy unique, to trzeba najpierw wypełnić pola danymi:
+
+```php
+public function up(Schema $schema): void
+{
+    $this->addSql('UPDATE starship SET slug = id, created_at = arrived_at, updated_at = arrived_at'); // wypełnienie
+    
+    // this up() migration is auto-generated, please modify it to your needs
+    $this->addSql('ALTER TABLE starship ALTER slug SET NOT NULL');
+    $this->addSql('ALTER TABLE starship ALTER updated_at SET NOT NULL');
+    $this->addSql('ALTER TABLE starship ALTER created_at SET NOT NULL');
+    $this->addSql('CREATE UNIQUE INDEX UNIQ_C414E64A989D9B62 ON starship (slug)');
+}
+```
+
+Sprawdzenie czy operacje poprawnie zostały wykonane następuje przez komendę:
+
+> symfony console dbal:run-sql 'SELECT name, slug, updated_at, created_at FROM starship'
+
+Załadowanie fixtures jeszcze nie zadziała, bo nowe pola nie zostały obsłużone:
+
+> symfony console doctrine:fixtures:load
+
+```error
+SQLSTATE[23502]: Not null violation: 7 ERROR:  null value in column "slug" of relation "starship" violates not-null constraint                  
+DETAIL:  Failing row contains (27, USS LeafyCruiser (NCC-0001), Garden, Jean-Luc Pickles, in progress, 2026-02-08 09:13:43, null, null, null).
+```
+
+### 11. Auto Slug and Timestamps with Doctrine Extensions
+
+Zadanie polega na tym, żeby znaczniki daty i slug generowały się automatycznie. Do tego ma służyć paczka:
+
+> composer require stof/doctrine-extensions-bundle
+
+Został dodany plik config/packages/stof_doctrine_extensions.yaml, do którego trzeba dodać właściwości obsługujące slug i timespampy:
+
+```yaml
+    orm:
+        default:
+            timestampable: true
+            sluggable: true
+```
+
+Użycie rozszerzenia odbywa się przez użycie Slug lub Timestampable i podanie nazwy pola na bazie którego ma być utworzony slug lub dodanie operacji na której ma być dodana data:
+
+```php
+#[Slug(fields: ['name'])]
+[...]
+
+#[Timestampable(on: 'update')]
+[...]
+
+#[Timestampable(on: 'create')]
+```
+
+Uruchomienie fixtures:
+
+> symfony console doctrine:fixtures:load
+
+Sprawdzenie za pomocą komendy:
+
+> symfony console dbal:run-sql 'SELECT name, slug, updated_at, created_at FROM starship'
+
+Jeśli elementy z nazwą powtarzały się, to w slugu do nazwy dodaje sie kolejne numery w postaci suffixu np. stellar-pirate-2
+
+### 12. High-Tech Controllers: Auto-inject Entities
+
+Aby przełączyć slug z ID na slug (czytelny dla ludzi i SEO friendly) trzeba zmienić kontroler:
+
+```php
+class StarshipController extends AbstractController
+{
+    #[Route('/starships/{slug}', name: 'app_starship_show')]
+    public function show(
+        #[MapEntity(mapping: ['slug' => 'slug'])]
+        Starship $ship
+    ): Response
+    {
+        return $this->render('starship/show.html.twig', [
+            'ship' => $ship,
+        ]);
+    }
+}
+```
+
+Atrybut MapEntity pozwala zmapować oczekiwany slug z routy na slug w encji.
+Dzięki temu jest obsługiwana routa ze slugiem, ale nie działa już routa z id.
+
+Encje są przekazywane do kontrolera za pomoca Controller Value Resolvers.
+**Controller Value Resolvers** - mechanizm analizujący jakie wartości na podstawie argumentów mają być przekazane do kontrolera np. jaka encja na podstawie routy.
+
+### 13. Black Hole: Deleting Entities
+
+Usunięcie odbędzie się za pomoca komendy. Tworzenie nowej komendy:
+
+> symfony console make:command
+
+Trzeba zmodyfikować plik z komendą, tak aby działać na repozytorium.
+Pobieramy informacje o tym czego ma dotyczyć komenda z inputu:
+
+```php
+$io = new SymfonyStyle($input, $output);
+[...]
+$slug = $input->getArgument('slug');
+```
+
+Za pomocą $io wyświetlamy w konsoli informacje o postępach komend.
+Uruchomienie komendy następuje z apomocą:
+
+> symfony console app:ship:remove leafy-cruiser-ncc-0001
+
+Podczas przeszukiania reposytorium można używać metod jak findOneBy(), ponieważ wartości wstrzykiwane do nich są escapowane.
+
+Metoda: EntityManagerInterface::remove(), służy do dodania obiektów które mają być usunięte (odwrotność ::add()). Po niej należy wykonać flush().
+
+### 14. Ship Upgrades: Updating an Entity
+
+Utworzenie komendy aktualizującej status:
+
+> symfony console make:command
+
+Nadanie nazwy: app:ship:check-in
+
+Aktualizacja komendy.
+
+```php
+$ship->setArrivedAt(new \DateTimeImmutable('now'));
+$ship->setStatus(StarshipStatusEnum::WAITING);
+
+$this->em->flush();
+```
+
+Doctrine wie, że podczas aktualizacji encji wystarczy ją śledić i czekać na flush(), dlatego nie ma żadnej dodatkowej metody kolejkującej - persist() jest wymagany dla nowych rekordów.
+
+### 15. Quantum Refactor: Rich Entities
+
+Refaktoryzacja ma na celu przeniesienie operacji aktualizacji statusu z komendy do encji, co ma uczynić ją bardziej re-używalną i prostszą w utrzymaniu.
+
+```php
+public function checkIn(?\DateTimeImmutable $arrivedAt = null): static
+{
+    $this->arrivedAt = $arrivedAt ?? new \DateTimeImmutable('now');
+    $this->status = StarshipStatusEnum::WAITING;
+
+    return $this;
+}
+```
+
+Następnie w komendzie używa się już tylko $ship->checkIn();
