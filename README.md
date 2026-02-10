@@ -1418,3 +1418,36 @@ public function newStarshipPart(): Response {
 
 Tworzenie FormType jest ważne, ponieważ pozwala wydzielić logikę formularza poza kontroler, co jest zdecydowanie dobrą praktyką.
 Mapowanie formularza na podstawie encji pozawala symfony utworzyć formularz automatycznie, automatycznie obsłużyć i zwalidować dane na podstawie metadanych encji.
+
+### 02. Rendering the Form
+
+Były problemu z uruchomieniem tailwindcss, ponieważ potrzebna była w docker-compose obsługa tailwinda:
+
+```yaml
+tailwind:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile
+    container_name: myapp-tailwind
+    command: php bin/console tailwind:build --watch
+    volumes:
+      - .:/var/www
+    depends_on:
+      - php
+```
+
+Dodanie przycisku wysyłającego formularz może odbyć się na dwa sposoby.
+
+- dodanie pola SubmitField
+- przez dodanie zwykłego przycisku html pomiędzy elementami wyrenderowanego formularza
+
+```twig.html
+{{ form_start(form) }}
+    {{ form_widget(form) }}
+    <button type="submit" class="text-white bg-green-700 hover:bg-green-800 rounded-lg px-5 py-2.5 me-2 mb-2 cursor-pointer">Create</button>
+{{ form_end(form) }}
+```
+
+Jeśli zostanie pominięte wypełnienie atrybutu action, to formularz zostanie wysłany pod aktualny adres URL.
+
+### 03. Processing the Submitted Form

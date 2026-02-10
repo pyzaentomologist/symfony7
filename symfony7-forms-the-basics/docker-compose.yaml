@@ -9,7 +9,16 @@ services:
       - .:/var/www
     ports:
       - "8080:80"
-
+  tailwind:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile
+    container_name: myapp-tailwind
+    command: php bin/console tailwind:build --watch
+    volumes:
+      - .:/var/www
+    depends_on:
+      - php
 ###> doctrine/doctrine-bundle ###
   database:
     image: postgres:${POSTGRES_VERSION:-16}-alpine
