@@ -1394,7 +1394,7 @@ Następnie w komendzie używa się już tylko $ship->checkIn();
 
 ### 01. Creating a Form Type Class
 
-W selu obsługi formularzy przez symfony nalezy pobrać bibliotekę 
+W celu obsługi formularzy przez symfony nalezy pobrać bibliotekę
 
 > symfony composer require form
 
@@ -1451,3 +1451,494 @@ Dodanie przycisku wysyłającego formularz może odbyć się na dwa sposoby.
 Jeśli zostanie pominięte wypełnienie atrybutu action, to formularz zostanie wysłany pod aktualny adres URL.
 
 ### 03. Processing the Submitted Form
+
+Informacje o stanie formularza pobiera się metodą handleRequest
+
+```php
+$form->handleRequest($request);
+```
+
+Gdy zostanie pobrana informacja, można sprawdzić czy formularz został poprawnie zapisany:
+
+```php
+if ($form->isSubmitted()) {
+```
+
+Jeśli tak, to pobieramy dane z getData(), zapisujemy entityManagerem (realnie metody powinny być w repository), przekazujemy do szablonu informację o sukcesie i przekierowujemy na listę elementów:
+
+```php
+if ($form->isSubmitted()) {
+    /** @var StarshipPart $part */
+    $part = $form->getData();
+    $entityManager->persist($part);
+    $entityManager->flush();
+    $this->addFlash('success', sprintf('The part "%s" was successfully created.', $part->getName()));
+
+    return $this->redirectToRoute('app_part_index');
+}
+```
+
+### 04. Multiple Submit Buttons
+
+#### Dodanie drugiego przycisku do formularza
+
+Przycisk moża dodać metoda add(), przekazując informację jakiego typu ma to być pole: SubmitType::class. Tekstem na formularzu będzie nazwa elementu:
+
+```php
+public function buildForm(FormBuilderInterface $builder, array $options): void
+{
+    $builder
+        ->add('createAndAddNew', SubmitType::class) // "Create andd add new"
+    ;
+}
+```
+
+#### Uzyskanie dostępu do pola niezmapowanego
+
+```php
+$createAndAddNewBtn = $form->get('createAndAddNew');
+```
+
+#### Wykorzystanie kliknięcia
+
+```php
+/** @var SubmitButton $createAndAddNewBtn */
+$createAndAddNewBtn = $form->get('createAndAddNew');
+if ($createAndAddNewBtn->isClicked()) {
+    return $this->redirectToRoute('app_admin_starship_part_new');
+}
+```
+
+#### Automatyczne przypisywanie typów pól
+
+Symfony riozpoznaje typy poprzez drugi parametr metody add() w builderze.
+Jeśli nie jest podany typ w add(), to symfony bierze tę informację z Encji.
+
+#### Wbudowane typy pól formularzy
+
+Sprawdzenie wbudowanych typów pól formularzy:
+
+> symfony console debug:form
+
+Do sprawdzenia specyficznego typu potrzebna jest komenda:
+
+> symfony console debug:form TextType
+> symfony console debug:form EntityType
+
+Trzeci argument metody add() to opcje:
+
+```php
+->add('starship', EntityType::class, [
+                'class' => Starship::class,
+```
+
+Mogą to być wartości selecta lub właściwość required.
+
+### 5. Built-in Symfony Form Themes
+
+Symfony ma zestaw wbudowanych themes dla formularzy.
+
+[https://symfony.com/doc/current/form/form_themes.html#using-form-themes](https://symfony.com/doc/current/form/form_themes.html#using-form-themes)
+
+Dodanie theme do formularza przez wskazanie, który formularz ma zostać dodany:
+
+```twig
+{% form_theme form 'tailwind_2_layout.html.twig' %}
+```
+
+Jeśli potrzebujemy można odpytać bazę za pomoca queryBuildera, tak aby uzyskać opcje selecta posortowane:
+
+```php
+->add('starship', EntityType::class, [
+    'class' => Starship::class,
+    'choice_label' => 'name',
+    'query_builder' => function (EntityRepository $repo) {
+        return $repo->createQueryBuilder('starship')
+            ->orderBy('starship.name', Order::Ascending->value);
+    },
+])
+```
+
+Opcję w select możemy wyświetlać w spersonalizowany sposób:
+
+```php
+'choice_label' => function (Starship $starship) {
+    return sprintf(
+        '%s (by %s)',
+        $starship->getName(),
+        $starship->getCaptain(),
+    );
+},
+```
+
+Za pomoca buildera można dodawać atrybuty metodą add() do elementów html np. class:
+
+```php
+->add('createAndAddNew', SubmitType::class, [
+    'attr' => [
+        'class' => 'text-white bg-blue-700 hover:bg-blue-800 rounded-lg px-5 py-2.5 me-2 mb-2 cursor-pointer',
+    ],
+])
+```
+
+### 6. Client-side vs Server-side Validation
+
+Validator dla symfony instaluje się za pomocą:
+
+> symfony composer require validator
+
+Wyłączenie walidacji może nastąpić przez usunięcie atrybutu required, dodanie validate => false:
+
+```php
+->add('createAndAddNew', SubmitType::class, [
+    'validate' => false,
+    'attr' => [
+        'class' => 'text-white bg-blue-700 hover:bg-blue-800 rounded-lg px-5 py-2.5 me-2 mb-2 cursor-pointer',
+    ],
+])
+```
+
+Lub dodając w drzewie html atrybut formnovalidate="formnovalidate" do wybranego pola.
+
+Blokowanie błędnych danych odbywa się przez dodanie warunku:
+
+```php
+if ($form->isSubmitted() && $form->isValid()) {
+```
+
+Własna obsługa błędów odbywa się przez constraints:
+
+```php
+$builder
+    ->add('name', null, [
+        'constraints' => [
+            new NotBlank([], 'Every part should have a name!'),
+        ],
+    ])
+```
+
+Aby mieć pobrane klasy używane w obsłudze błędów przez szablon z tailwind trzeba dodać @source do styles/app.css:
+
+```css
+@source "./../../vendor/symfony/twig-bridge/Resources/views/Form/tailwind_2_layout.html.twig";
+```
+
+### 7. Validation Constraints
+
+Oprócz nadania warunków akceptacji wartości pola w formularzu, można narzucić walidację z poziomu encji za pomocą Symfony\Component\Validator\Constraints.
+
+```php
+$builder
+    ->add('name', null, [
+//     'constraints' => [
+//         new NotBlank([], 'Every part should have a name!'),
+//     ],
+    ])
+```
+
+```php
+use Symfony\Component\Validator\Constraints as Assert;
+
+class StarshipPart
+{
+    #[Assert\NotBlank(message: 'Every part should have a name!')]
+    private ?string $name = null;
+}
+```
+
+Jest wiele warunków które można narzucić na pola jak NotBlank, GreatherThan itd.:
+
+```php
+#[Assert\NotBlank(message: 'You forgot to set the price!')]
+#[Assert\GreaterThan(value: 0, message: 'Starship part cannot be free')]
+```
+
+Pola walidatora są dostępne w profilerze symfony.
+
+Symfony obsługuje CSRF (Cross-Site Request Forgery). CSRF w symfony jest bezstanowe, sprawdza nagłówki tokenów, czy zgadzają się domeny.
+
+> symfony composer require symfony/security-csrf
+
+### 8. Organizing Form Fields
+
+Układ formularzy można zmieniać albo przez zmianę kolejności pól, albo przez ustawienia priorytetu:
+
+```php
+->add('starship', EntityType::class, [
+    'class' => Starship::class,
+    'choice_label' => function (Starship $starship) {
+        return sprintf(
+            '%s (by %s)',
+            $starship->getName(),
+            $starship->getCaptain(),
+        );
+    },
+    'query_builder' => function (EntityRepository $repo) {
+        return $repo->createQueryBuilder('starship')
+            ->orderBy('starship.name', Order::Ascending->value);
+    },
+    'priority' => 10,
+])
+```
+
+Domyślnie pola ustawiają priorytet na 0. Im wyższy priorytet, tym wyższe położenie pola. Priorytety mogą być ujemne.
+
+#### Dostosowanie wyglądu formularza
+
+Pomiędzy funkcjami pomocniczymi form_start i form_end umieszcza się inne funkcje pomocnicze, pomagające umiejscowić pola oraz ustylować wygląd formularza.
+Zamiast dodawać atrybuty elementów html w php formularza, lepiej dodać je w twigu:
+
+```php
+->add('createAndAddNew', SubmitType::class, [
+    'validate' => false,
+    'attr' => [ // całość do przeniesienia
+        'class' => 'text-white bg-blue-700 hover:bg-blue-800 rounded-lg px-5 py-2.5 me-2 mb-2 cursor-pointer',
+    ],
+```
+
+```twig
+{{ form_start(form) }}
+    {{ form_errors(form) }}
+    {{ form_row(form.starship) }}
+    <div class="grid grid-cols-2 gap-4">
+        {{ form_row(form.name) }}
+        {{ form_row(form.price) }}
+    </div>
+    {{ form_row(form.notes) }}
+    {{ form_widget(form.createAndAddNew, {
+        'attr': {
+            'class': 'text-white bg-blue-700 hover:bg-blue-800 rounded-lg px-5 py-2.5 me-2 mb-2 cursor-pointer',
+        },
+    }) }}
+    <button type="submit" class="text-white bg-green-700 hover:bg-green-800 rounded-lg px-5 py-2.5 me-2 mb-2 cursor-pointer">Create and close</button>
+    {{ form_rest(form) }}
+    {#
+        Anything you want to add after all fields are rendered
+        but before the closing </form>
+    #}
+{{ form_end(form) }}
+```
+
+Funkcje istniejące podczas renderowania formularzy:
+
+form_start(), form_end(), form_help(), form_label(), form_widget(), form_errors(), form_row()
+
+### 9. Embracing Entity's CRUD Operations
+
+Tworzenie całego CRUDa z formularzem, kontrolerem i widokami następuje po wprowadzeniu komendy:
+
+> symfony console make:crud
+> Starship
+> StarshipAdminController
+
+```text
+created: src/Controller/StarshipAdminController.php
+created: src/Form/StarshipType.php
+created: templates/starship_admin/_delete_form.html.twig
+created: templates/starship_admin/_form.html.twig
+created: templates/starship_admin/edit.html.twig
+created: templates/starship_admin/index.html.twig
+created: templates/starship_admin/new.html.twig
+created: templates/starship_admin/show.html.twig
+```
+
+Po rejestracji CRUDa pojawiła się potrzeba rozwiązania błędu z odczytem enum na szablonie:
+
+```twig
+{% for starship in starships %}
+    <tr>
+        <td>{{ starship.id }}</td>
+        <td>{{ starship.name }}</td>
+        <td>{{ starship.class }}</td>
+        <td>{{ starship.captain }}</td>
+        <td>{{ starship.status.value }}</td>
+        <td>{{ starship.arrivedAt ? starship.arrivedAt|date('Y-m-d H:i:s') : '' }}</td>
+        <td>{{ starship.slug }}</td>
+        <td>{{ starship.createdAt ? starship.createdAt|date('Y-m-d H:i:s') : '' }}</td>
+        <td>{{ starship.updatedAt ? starship.updatedAt|date('Y-m-d H:i:s') : '' }}</td>
+        <td>
+            <a href="{{ path('app_starship_admin_show', {'id': starship.id}) }}">show</a>
+            <a href="{{ path('app_starship_admin_edit', {'id': starship.id}) }}">edit</a>
+        </td>
+    </tr>
+{% else %}
+    <tr>
+        <td colspan="10">no records found</td>
+    </tr>
+{% endfor %}
+```
+
+Oprócz niezgodności enum ze stringiem, pojawił się błąd w src/Form/Starshiptype.php.
+Wartość powinna być przekazywana jako enum, a nie domyślny string:
+
+```php
+->add('status', EnumType::class)
+```
+
+Następnie Pojawił się błąd o braku opcji "class" w EnumType:
+
+Zdebugowano komendą:
+
+> symfony console debug:form EnumType
+
+Dodano opcję "class" w metodzie add():
+
+```php
+->add('status', EnumType::class, [
+    'class' => StarshipStatusEnum::class,
+])
+```
+
+Pozostałe czynności w lekcji to stylowanie layoutów.
+
+### 10. Forms Without a Data Class
+
+Dodanie formularza nie korzystającego z encji np. do szukania:
+
+> symfony console make:form
+
+Dobrym powodem do korzystania z Symfony Forms bez encji jest przechowywanie prostych danych w tablicach php jak w wyszukiwarkach.
+
+Ustala się nazwę formularza oraz akceptuje pustą encję.
+
+Został utworzony kontroller oraz formularz.
+
+Formularz posiada jedno pole, nie zawierające etykiety, zzawierające placeholder oraz class tailwindcss:
+
+```php
+public function buildForm(FormBuilderInterface $builder, array $options): void
+{
+    $builder
+        ->add('query', null, [
+            'label' => false,
+            'attr' => [
+                'placeholder' => 'Search...',
+                'class' => 'w-full p-3 pl-10 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+            ],
+        ])
+    ;
+}
+```
+
+W Kontrolerze rejestruję nowy formularz i przekazuję go do widoku:
+
+```php
+public function index(StarshipPartRepository $repository, Request $request,): Response
+{
+    $searchForm = $this->createForm(PartSearchType::class);
+
+    $query = $request->query->getString('query');
+    $parts = $repository->findAllOrderedByPrice($query);
+
+    return $this->render('part/index.html.twig', [
+        'parts' => $parts,
+        'searchForm' => $searchForm,
+    ]);
+}
+```
+
+Domyślnie formularze korzystają z POSTa, ale można zmienić na GETa, co jest użyteczne w przypadku wyszukiwarek, dokładających parametry do zapytań.
+
+### 11. Submitting a Form via GET
+
+Zmiana metody http z POST na GET odbywa się w ustawieniu formularza np. PartSearchType:
+
+```php
+public function configureOptions(OptionsResolver $resolver): void
+{
+    $resolver->setDefaults([
+        // Configure your form options here
+        'method' => Request::METHOD_GET,
+    ]);
+}
+```
+
+Po zmianie protokołu z domyślnego POSTa na GET, input działa. Domyślnie formularze symfony są escapowane, dlatego %5B i %5D wyświetlają sie zamiast [].
+Aby temu zapobiec powinna zostać zadeklarowana metoda:
+
+```php
+public function getBlockPrefix(): string
+{
+    return '';
+}
+```
+
+Formularz teraz uderza z tokenem csrf, który jest niepotrzebny i można go wyłaczyć:
+
+```php
+public function configureOptions(OptionsResolver $resolver): void
+{
+    $resolver->setDefaults([
+        // Configure your form options here
+        'method' => Request::METHOD_GET,
+        'csrf_protection' => false,
+    ]);
+}
+```
+
+Pole formularza nie powinno być wymagane, posta wartośc powinna zwrócić wszystkie wartości:
+
+```php
+public function buildForm(FormBuilderInterface $builder, array $options): void
+{
+    $builder
+        ->add('query', null, [
+            'required' => false,
+            'label' => false,
+        ])
+    ;
+}
+```
+
+Kontroler powinien zaimplementować obsługę symfony-form zamiast bezpośredniego odczytywania query z requesta.
+
+```php
+public function index(StarshipPartRepository $repository, Request $request,): Response
+{
+    $searchForm = $this->createForm(PartSearchType::class);
+    //$query = $request->query->getString('query');
+    $query = null;
+    $searchForm->handleRequest($request);
+    if ($searchForm->isSubmitted() && $searchForm->isValid()) {
+        $query = $searchForm->get('query')->getData();
+    }
+    $parts = $repository->findAllOrderedByPrice($query);
+    return $this->render('part/index.html.twig', [
+        'parts' => $parts,
+        'searchForm' => $searchForm,
+    ]);
+}
+```
+
+Style formularza powinny być blisko layoutu. Implementuje się formularz searchForm. Aby ostylować sam input trzeba odwołać się do niego w form_widget:
+
+```twig
+<div class="relative w-full max-w-md">
+    {{ form_start(searchForm) }}
+        {{ form_widget(searchForm.query, {
+            'attr': {
+                'placeholder': 'Search...',
+                'class': 'w-full p-3 pl-10 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+            },
+        }) }}
+    {{ form_end(searchForm) }}
+    <svg class="absolute left-3 top-3 w-5 h-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m0 0A8.5 8.5 0 1011 19.5a8.5 8.5 0 005.65-2.85z" />
+    </svg>
+</div>
+```
+
+Input domyślnie otrzymuje typ TextType, ale powinien SearchType implemntowany przez symfony form.
+Dzięki temu mamy możliwość korzystania z pełni funkcji jak np. przycisk czyszcenia inputa:
+
+```php
+public function buildForm(FormBuilderInterface $builder, array $options): void
+{
+    $builder
+        ->add('query', SearchType::class, [
+            'label' => false,
+            'required' => false,
+        ])
+    ;
+}
+```

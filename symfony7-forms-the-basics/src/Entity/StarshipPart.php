@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use Symfony\Component\Validator\Constraints as Assert;
 use App\Repository\StarshipPartRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -17,9 +18,12 @@ class StarshipPart
     #[ORM\Column]
     private ?int $id = null;
 
+    #[Assert\NotBlank(message: 'Every part should have a name!')]
     #[ORM\Column(length: 255)]
     private ?string $name = null;
 
+    #[Assert\NotBlank(message: 'Every part should have a price!')]
+    #[Assert\GreaterThan(value: 0, message: 'Starship parts cannot be free!')]
     #[ORM\Column]
     private ?int $price = null;
 
